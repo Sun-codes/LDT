@@ -19,74 +19,103 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  e.preventDefault();
 
-    setLoading(true);
-    setMessage("");
+  setLoading(true);
+  setMessage("");
 
-    // LOGIN
-    if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+  if (mode === "login") {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) {
-        setMessage(error.message);
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user?.id)
-        .single();
-
-      if (profile?.role === "freelancer") {
-        router.push("/freelancer");
-      } else { 
-        router.push("/business");
-      }
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
     }
 
-    // REGISTER
-    if (mode === "register") {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (error) {
-        setMessage(error.message);
-        setLoading(false);
-        return;
-      }
-
-      const userId = data.user?.id;
-
-      if (userId) {
-        await supabase.from("profiles").insert({
-          id: userId,
-          full_name: fullName,
-          role,
-        });
-      }
-
-      setMessage("Account created. You can now log in.");
-      setMode("login");
+    if (!user) {
+      setMessage("No user found after login.");
+      setLoading(false);
+      return;
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      setMessage("Profile not found. Please register again.");
+      setLoading(false);
+      return;
+    }
+
+    if (profile.role === "freelancer") {
+      router.push("/freelancer");
+      return;
+    }
+
+    if (profile.role === "umkm") {
+      router.push("/business");
+      return;
+    }
+
+    setMessage("Unknown role.");
+    setLoading(false);
+    return;
+  }
+
+  if (mode === "register") {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const userId = data.user?.id;
+
+    if (!userId) {
+      setMessage("Account created, but user ID was not found.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: profileInsertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: userId,
+        full_name: fullName,
+        role,
+      });
+
+    if (profileInsertError) {
+      setMessage(profileInsertError.message);
+      setLoading(false);
+      return;
+    }
+
+    setMessage("Account created. You can now log in.");
+    setMode("login");
     setLoading(false);
   }
+}
 
   return (
     <main className="min-h-screen bg-purple-50 text-slate-950">
-      <section className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-6 py-12 md:grid-cols-2">
+      <section className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 md:grid-cols-2 md:px-6 md:py-12">
         
         {/* LEFT SIDE */}
         <div>
@@ -94,7 +123,7 @@ export default function LoginPage() {
             GrowNow Marketplace
           </div>
 
-          <h1 className="text-5xl font-extrabold leading-tight">
+          <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
             Connect UMKM with the right freelance talent.
           </h1>
 
@@ -105,7 +134,7 @@ export default function LoginPage() {
         </div>
 
         {/* RIGHT SIDE */}
-        <div className="rounded-3xl bg-white p-8 shadow-xl shadow-purple-100">
+        <div className="w-full rounded-3xl bg-white p-6 shadow-xl shadow-purple-100 sm:p-8">
           <h2 className="text-3xl font-bold">
             {mode === "login" ? "Welcome back" : "Create account"}
           </h2>
